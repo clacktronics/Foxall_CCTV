@@ -3,7 +3,14 @@ import urllib
 import StringIO
 from time import gmtime, strftime
 from timeit import default_timer as timer
+import RPi.GPIO as GPIO
 
+PIN = 13
+
+GPIO.setmode(GPIO.BOARD)
+GPIO.setwarnings(False)
+GPIO.setup(PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+GPIO.add_event_detect(PIN, GPIO.FALLING, bouncetime=2000)
 
 class camera(object):
     def __init__(self,url,buffer):
@@ -55,11 +62,11 @@ while True:
     # print l
     # print "----"
 
-    if i > 5:
+    if  GPIO.event_detected(PIN):
         print "export"
         canvas = Image.new("L",(2480,3508),255)
         draw = ImageDraw.Draw(canvas)
-        fnt = ImageFont.truetype('Pillow/Tests/fonts/FreeMono.ttf', 40)
+        fnt = ImageFont.truetype('DejaVuSansMono.ttf', 40)
 
         image_w, image_h = camera1.buffer[-1][1].size
         canvas_w, canvas_h = canvas.size
@@ -68,11 +75,11 @@ while True:
         canvas.paste(camera1.buffer[0][1],(centre_w-image_w-100,100))
         canvas.paste(camera1.buffer[-1][1],(centre_w+100,100))
 
-        draw.text((centre_w-image_w-100,image_h+100), camera1.buffer[0][0], font=fnt)
-        draw.text((centre_w+100,image_h+100), camera1.buffer[-1][0], font=fnt)
+        draw.text((centre_w-image_w-100,image_h+100), camera1.buffer[0][0], font = fnt)
+        draw.text((centre_w+100,image_h+100), camera1.buffer[-1][0], font = fnt)
 
         canvas.save("image.jpg")
         del draw
         del canvas
         i = 0
-        #call(['lp','image.jpg'])
+        call(['lp','image.jpg'])
