@@ -1,6 +1,5 @@
 from PIL import Image, ImageDraw, ImageFont
-import urllib
-import StringIO
+import urllib, StringIO, base64
 from time import gmtime, strftime
 from timeit import default_timer as timer
 import RPi.GPIO as GPIO
@@ -43,16 +42,19 @@ class camera(object):
 from time import sleep
 from subprocess import call
 
-camera1 = camera("http://192.168.1.112:81/videostream.cgi?user=admin&pwd=&resolution=32&rate=0",10)
-
+camera1 = camera("http://192.168.1.123:81/videostream.cgi?user=admin&pwd=888888",10)
+camera2 = camera("http://192.168.1.120:81/videostream.cgi?user=admin&pwd=888888",10)
 i=0
 
 last_time = timer()
 
+once = True
+
 while True:
 
-    if (timer() - last_time) > 1:
+    if (timer() - last_time) > .5:
         camera1.updateImage()
+        camera2.updateImage()
         i+=1
         print camera1.buffer[-1][0]
         last_time = timer()
@@ -69,17 +71,60 @@ while True:
         fnt = ImageFont.truetype('DejaVuSansMono.ttf', 40)
 
         image_w, image_h = camera1.buffer[-1][1].size
-        canvas_w, canvas_h = canvas.size
-        centre_w = canvas_w/2
 
-        canvas.paste(camera1.buffer[0][1],(centre_w-image_w-100,100))
-        canvas.paste(camera1.buffer[-1][1],(centre_w+100,100))
+	crop_w = image_h  #int(image_w*0.8)
+	
+	cutoff = (image_w - crop_w) / 2	
 
-        draw.text((centre_w-image_w-100,image_h+100), camera1.buffer[0][0], font = fnt)
-        draw.text((centre_w+100,image_h+100), camera1.buffer[-1][0], font = fnt)
+	image1a = camera1.buffer[0][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image1b = camera1.buffer[-1][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2a = camera2.buffer[0][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2b = camera2.buffer[-1][1].crop((cutoff,0,image_w-cutoff,image_h))
 
-        canvas.save("image.jpg")
+        image_w, image_h = image1a.size
+
+	scale = 3
+	iscalew = int(image_w * scale)
+	iscaleh = int(image_h * scale)
+
+	print iscalew, iscaleh
+
+	image1a = image1a.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	image1b = image1b.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	image2a = image2a.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	image2b = image2b.resize((iscalew,iscaleh), Image.ANTIALIAS)
+
+	if once:
+        	images_w, images_h = image1a.size
+        	canvas_w, canvas_h = canvas.size
+        	centre_w = canvas_w/2
+		imagepos_w = (centre_w / 2) - (images_w / 2)
+		top = 500
+		gap = 100
+		once = False
+
+        canvas.paste(image1a,(imagepos_w,top))
+        canvas.paste(image1b,(imagepos_w,images_h+top+gap))
+        canvas.paste(image2a,(centre_w+imagepos_w,top))
+        canvas.paste(image2b,(centre_w+imagepos_w,images_h+top+gap))
+
+	uid = base64.b16encode(strftime("%d%a%H%M%S", gmtime()))
+	print strftime("%a%H%M%S", gmtime())
+        draw.text((imagepos_w,images_h+top), camera1.buffer[0][0], font = fnt)
+        draw.text((imagepos_w,images_h*2+top+100), camera1.buffer[-1][0], font = fnt)
+        draw.text((centre_w+imagepos_w,images_h+top), camera2.buffer[0][0], font = fnt)
+        draw.text((centre_w+imagepos_w,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
+        
+	tw, _ = draw.textsize(uid, font=fnt)
+	draw.text((centre_w-(tw/2),canvas_h-200), uid, font = fnt, align="center")
+
+        canvas.save("shot_%s.jpg" % uid)
+        #image1a.save("image1a.jpg")
+        #image1b.save("image1b.jpg")
+        #image2a.save("image2a.jpg")
+        #image2b.save("image2b.jpg")
+
         del draw
         del canvas
         i = 0
-        call(['lp','image.jpg'])
+#        call(['lp','image.jpg'])
