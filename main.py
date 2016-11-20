@@ -114,11 +114,13 @@ while True:
         draw.text((imagepos_w,images_h*2+top+100), camera1.buffer[-1][0], font = fnt)
         draw.text((centre_w+imagepos_w,images_h+top), camera2.buffer[0][0], font = fnt)
         draw.text((centre_w+imagepos_w,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
+
+        canvas.save("upload_%s.jpg" % uid)
         
 	tw, _ = draw.textsize(uid, font=fnt)
 	draw.text((centre_w-(tw/2),canvas_h-200), uid, font = fnt, align="center")
 
-        canvas.save("shot_%s.jpg" % uid)
+        canvas.save("printout_%s.jpg" % uid)
         #image1a.save("image1a.jpg")
         #image1b.save("image1b.jpg")
         #image2a.save("image2a.jpg")
@@ -127,4 +129,5 @@ while True:
         del draw
         del canvas
         i = 0
-#        call(['lp','image.jpg'])
+	printout = "printout_%s.jpg" % uid 
+        call(['lp',printout])
