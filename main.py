@@ -3,6 +3,29 @@ import urllib, StringIO, base64
 from time import gmtime, strftime
 from timeit import default_timer as timer
 import RPi.GPIO as GPIO
+import boto, csv, sys
+
+
+# AMAZON S3 SETTINGS
+
+keys = open('accessKeys.csv', 'r')
+reader = csv.reader(keys)
+reader.next()
+BUCKET,_ ,ACCESS_KEY, SECRET_KEY = reader.next()
+keys.close()
+REGION_HOST = 's3-eu-central-1.amazonaws.com'
+
+conn = boto.connect_s3(ACCESS_KEY, SECRET_KEY, host=REGION_HOST)
+bucket = conn.get_bucket(BUCKET)
+
+k = boto.s3.key.Key(bucket)
+
+def percent_cb(complete, total):
+    sys.stdout.write(' <3 ')
+    sys.stdout.flush()
+
+
+# GPIO SETTINGS
 
 PIN = 13
 
@@ -10,6 +33,9 @@ GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
 GPIO.setup(PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
 GPIO.add_event_detect(PIN, GPIO.FALLING, bouncetime=2000)
+
+
+# CAMERA CLASS
 
 class camera(object):
     def __init__(self,url,buffer):
@@ -115,19 +141,25 @@ while True:
         draw.text((centre_w+imagepos_w,images_h+top), camera2.buffer[0][0], font = fnt)
         draw.text((centre_w+imagepos_w,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
 
-        canvas.save("upload_%s.jpg" % uid)
+        canvas.save("%s_upload.jpg" % uid)
+
+        image1a.save("%s_1a.jpg" % uid)
+        image1b.save("%s_1b.jpg" % uid)
+        image2a.save("%s_2a.jpg" % uid)
+        image2b.save("%s_2b.jpg" % uid)
         
 	tw, _ = draw.textsize(uid, font=fnt)
 	draw.text((centre_w-(tw/2),canvas_h-200), uid, font = fnt, align="center")
 
-        canvas.save("printout_%s.jpg" % uid)
-        #image1a.save("image1a.jpg")
-        #image1b.save("image1b.jpg")
-        #image2a.save("image2a.jpg")
-        #image2b.save("image2b.jpg")
+        canvas.save("%s_print.jpg" % uid)
+	
+	for img_up in ["%s_upload.jpg" % uid, "%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
+		k.key = img_up
+		k.set_contents_from_filename(img_up, cb=percent_cb, num_cb=10)
+
+        i = 0
+	printout = "%s_print.jpg" % uid 
+        #call(['lp',printout])
 
         del draw
         del canvas
-        i = 0
-	printout = "printout_%s.jpg" % uid 
-        call(['lp',printout])
