@@ -1,6 +1,6 @@
 from PIL import Image, ImageDraw, ImageFont
-import urllib, StringIO, base64
-from time import gmtime, strftime
+import urllib2, StringIO, base64
+from time import gmtime, strftime, time
 from timeit import default_timer as timer
 import RPi.GPIO as GPIO
 import boto, csv, sys
@@ -21,7 +21,7 @@ bucket = conn.get_bucket(BUCKET)
 k = boto.s3.key.Key(bucket)
 
 def percent_cb(complete, total):
-    sys.stdout.write(' <3 ')
+    sys.stdout.write('<3')
     sys.stdout.flush()
 
 
@@ -48,22 +48,27 @@ class camera(object):
 
 
     def updateImage(self):
-        self.buffer.append([strftime("%Y-%m-%d %H:%M:%S", gmtime()), self.getImage()])
+        self.buffer.append([strftime("%Y-%m-%d %H:%M:%S", gmtime()), self.getImage().convert("L")])
         if len(self.buffer) > self.buffer_len:
             self.buffer.pop(0)
             #self.last = self.current.copy()
 
     def getImage(self):
-        stream = urllib.urlopen(self.url)
-        bytes=''
-        while True:
-            bytes+=stream.read(1024)
-            a = bytes.find('\xff\xd8')
-            b = bytes.find('\xff\xd9')
-            if a!=-1 and b!=-1:
-                jpg = bytes[a:b+2]
-                bytes= bytes[b+2:]
-                return Image.open(StringIO.StringIO(jpg))
+	try:
+        	stream = urllib2.urlopen(self.url, timeout = 2)
+        	bytes=''
+        	while True:
+            		bytes+=stream.read(1024)
+            		a = bytes.find('\xff\xd8')
+            		b = bytes.find('\xff\xd9')
+            		if a!=-1 and b!=-1:
+                		jpg = bytes[a:b+2]
+                		bytes= bytes[b+2:]
+                		return Image.open(StringIO.StringIO(jpg))
+	except Exception, e:
+		print "Error with camera %s" % self.url
+		print e
+		return Image.new("L", (360,360), 200)
 
 from time import sleep
 from subprocess import call
@@ -115,13 +120,13 @@ while True:
 
 	print iscalew, iscaleh
 
-	image1a = image1a.resize((iscalew,iscaleh), Image.ANTIALIAS)
-	image1b = image1b.resize((iscalew,iscaleh), Image.ANTIALIAS)
-	image2a = image2a.resize((iscalew,iscaleh), Image.ANTIALIAS)
-	image2b = image2b.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	limage1a = image1a.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	limage1b = image1b.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	limage2a = image2a.resize((iscalew,iscaleh), Image.ANTIALIAS)
+	limage2b = image2b.resize((iscalew,iscaleh), Image.ANTIALIAS)
 
 	if once:
-        	images_w, images_h = image1a.size
+        	images_w, images_h = limage1a.size
         	canvas_w, canvas_h = canvas.size
         	centre_w = canvas_w/2
 		imagepos_w = (centre_w / 2) - (images_w / 2)
@@ -129,37 +134,40 @@ while True:
 		gap = 100
 		once = False
 
-        canvas.paste(image1a,(imagepos_w,top))
-        canvas.paste(image1b,(imagepos_w,images_h+top+gap))
-        canvas.paste(image2a,(centre_w+imagepos_w,top))
-        canvas.paste(image2b,(centre_w+imagepos_w,images_h+top+gap))
+        canvas.paste(limage1a,(imagepos_w,top))
+        canvas.paste(limage1b,(imagepos_w,images_h+top+gap))
+        canvas.paste(limage2a,(centre_w+imagepos_w,top))
+        canvas.paste(limage2b,(centre_w+imagepos_w,images_h+top+gap))
 
-	uid = base64.b16encode(strftime("%d%a%H%M%S", gmtime()))
-	print strftime("%a%H%M%S", gmtime())
+	uid = str(int(time()))
+	#base64.b16encode(strftime("%d%a%H%M%S", gmtime()))
+	#print strftime("%a%H%M%S", gmtime())
         draw.text((imagepos_w,images_h+top), camera1.buffer[0][0], font = fnt)
         draw.text((imagepos_w,images_h*2+top+100), camera1.buffer[-1][0], font = fnt)
         draw.text((centre_w+imagepos_w,images_h+top), camera2.buffer[0][0], font = fnt)
         draw.text((centre_w+imagepos_w,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
 
-        canvas.save("%s_upload.jpg" % uid)
+        #canvas.save("%s_upload.jpg" % uid)
+
+        
+	tw, _ = draw.textsize(uid, font=fnt)
+	uid_base16 = base64.b16encode(uid)
+	draw.text((centre_w-(tw/2),canvas_h-200), uid_base16, font = fnt)
+
+        canvas.save("%s_print.jpg" % uid)
+	
+        i = 0
+	printout = "%s_print.jpg" % uid 
+        call(['lp',printout])
 
         image1a.save("%s_1a.jpg" % uid)
         image1b.save("%s_1b.jpg" % uid)
         image2a.save("%s_2a.jpg" % uid)
         image2b.save("%s_2b.jpg" % uid)
-        
-	tw, _ = draw.textsize(uid, font=fnt)
-	draw.text((centre_w-(tw/2),canvas_h-200), uid, font = fnt, align="center")
 
-        canvas.save("%s_print.jpg" % uid)
-	
-	for img_up in ["%s_upload.jpg" % uid, "%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
+	for img_up in ["%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
 		k.key = img_up
 		k.set_contents_from_filename(img_up, cb=percent_cb, num_cb=10)
-
-        i = 0
-	printout = "%s_print.jpg" % uid 
-        #call(['lp',printout])
 
         del draw
         del canvas
