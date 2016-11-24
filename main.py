@@ -15,8 +15,15 @@ BUCKET,_ ,ACCESS_KEY, SECRET_KEY = reader.next()
 keys.close()
 REGION_HOST = 's3-eu-central-1.amazonaws.com'
 
-conn = boto.connect_s3(ACCESS_KEY, SECRET_KEY, host=REGION_HOST)
-bucket = conn.get_bucket(BUCKET)
+while True:
+	try:
+		conn = boto.connect_s3(ACCESS_KEY, SECRET_KEY, host=REGION_HOST)
+		bucket = conn.get_bucket(BUCKET)
+		break
+	except Exception, e:
+		print "Cannot connect to S3"
+		print e
+
 
 k = boto.s3.key.Key(bucket)
 
@@ -73,8 +80,8 @@ class camera(object):
 from time import sleep
 from subprocess import call
 
-camera1 = camera("http://192.168.1.123:81/videostream.cgi?user=admin&pwd=888888",10)
-camera2 = camera("http://192.168.1.120:81/videostream.cgi?user=admin&pwd=888888",10)
+camera1 = camera("http://192.168.15.113:81/videostream.cgi?user=admin&pwd=888888",5)
+camera2 = camera("http://192.168.15.199:81/videostream.cgi?user=admin&pwd=888888",15)
 i=0
 
 last_time = timer()
@@ -104,13 +111,13 @@ while True:
         image_w, image_h = camera1.buffer[-1][1].size
 
 	crop_w = image_h  #int(image_w*0.8)
-	
-	cutoff = (image_w - crop_w) / 2	
+
+	cutoff = (image_w - crop_w) / 2
 
 	image1a = camera1.buffer[0][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image1b = camera1.buffer[-1][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image2a = camera2.buffer[0][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image2b = camera2.buffer[-1][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image1b = camera1.buffer[4][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2a = camera2.buffer[2][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2b = camera2.buffer[12][1].crop((cutoff,0,image_w-cutoff,image_h))
 
         image_w, image_h = image1a.size
 
@@ -134,30 +141,30 @@ while True:
 		gap = 100
 		once = False
 
-        canvas.paste(limage1a,(imagepos_w,top))
-        canvas.paste(limage1b,(imagepos_w,images_h+top+gap))
-        canvas.paste(limage2a,(centre_w+imagepos_w,top))
-        canvas.paste(limage2b,(centre_w+imagepos_w,images_h+top+gap))
+        canvas.paste(limage1a,(imagepos_w+20,top))
+        canvas.paste(limage1b,(imagepos_w+20,images_h+top+gap))
+        canvas.paste(limage2a,(centre_w+imagepos_w-75,top))
+        canvas.paste(limage2b,(centre_w+imagepos_w-75,images_h+top+gap))
 
 	uid = str(int(time()))
 	#base64.b16encode(strftime("%d%a%H%M%S", gmtime()))
 	#print strftime("%a%H%M%S", gmtime())
-        draw.text((imagepos_w,images_h+top), camera1.buffer[0][0], font = fnt)
-        draw.text((imagepos_w,images_h*2+top+100), camera1.buffer[-1][0], font = fnt)
-        draw.text((centre_w+imagepos_w,images_h+top), camera2.buffer[0][0], font = fnt)
-        draw.text((centre_w+imagepos_w,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
+        draw.text((imagepos_w+20,images_h+top), camera1.buffer[0][0]+" 1a", font = fnt)
+        draw.text((imagepos_w+20,images_h*2+top+100), camera1.buffer[-1][0]+" 1b", font = fnt)
+        draw.text((centre_w+imagepos_w-75,images_h+top), camera2.buffer[2][0]+" 2a", font = fnt)
+        draw.text((centre_w+imagepos_w-75,images_h*2+top+100), camera2.buffer[12][0]+" 2b", font = fnt)
 
         #canvas.save("%s_upload.jpg" % uid)
 
-        
+
 	tw, _ = draw.textsize(uid, font=fnt)
 	uid_base16 = base64.b16encode(uid)
-	draw.text((centre_w-(tw/2),canvas_h-200), uid_base16, font = fnt)
+	draw.text((imagepos_w+(images_w/2)+10,canvas_h-475), uid_base16, font = fnt)
 
         canvas.save("%s_print.jpg" % uid)
-	
+
         i = 0
-	printout = "%s_print.jpg" % uid 
+	printout = "%s_print.jpg" % uid
         call(['lp',printout])
 
         image1a.save("%s_1a.jpg" % uid)
@@ -165,9 +172,12 @@ while True:
         image2a.save("%s_2a.jpg" % uid)
         image2b.save("%s_2b.jpg" % uid)
 
-	for img_up in ["%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
-		k.key = img_up
-		k.set_contents_from_filename(img_up, cb=percent_cb, num_cb=10)
+	try:
+		for img_up in ["%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
+			k.key = img_up
+			k.set_contents_from_filename(img_up, cb=percent_cb, num_cb=10)
+	except Exception, e:
+		print e
 
         del draw
         del canvas
