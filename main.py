@@ -39,7 +39,7 @@ PIN = 13
 GPIO.setmode(GPIO.BOARD)
 GPIO.setwarnings(False)
 GPIO.setup(PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
-GPIO.add_event_detect(PIN, GPIO.FALLING, bouncetime=2000)
+GPIO.add_event_detect(PIN, GPIO.FALLING, bouncetime=5000)
 
 
 # CAMERA CLASS
@@ -55,7 +55,7 @@ class camera(object):
 
 
     def updateImage(self):
-        self.buffer.append([strftime("%Y-%m-%d %H:%M:%S", gmtime()), self.getImage().convert("L")])
+        self.buffer.append([strftime("%H:%M:%S", gmtime()), self.getImage().convert("L")])
         if len(self.buffer) > self.buffer_len:
             self.buffer.pop(0)
             #self.last = self.current.copy()
@@ -80,8 +80,8 @@ class camera(object):
 from time import sleep
 from subprocess import call
 
-camera1 = camera("http://192.168.15.113:81/videostream.cgi?user=admin&pwd=888888",5)
-camera2 = camera("http://192.168.15.199:81/videostream.cgi?user=admin&pwd=888888",15)
+camera1 = camera("http://192.168.64.102:81/videostream.cgi?user=admin&pwd=888888",15)
+camera2 = camera("http://192.168.64.103:81/videostream.cgi?user=admin&pwd=888888",15)
 i=0
 
 last_time = timer()
@@ -114,10 +114,10 @@ while True:
 
 	cutoff = (image_w - crop_w) / 2
 
-	image1a = camera1.buffer[0][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image1b = camera1.buffer[4][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image2a = camera2.buffer[2][1].crop((cutoff,0,image_w-cutoff,image_h))
-	image2b = camera2.buffer[12][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image1a = camera1.buffer[2][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image1b = camera1.buffer[11][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2a = camera2.buffer[6][1].crop((cutoff,0,image_w-cutoff,image_h))
+	image2b = camera2.buffer[-1][1].crop((cutoff,0,image_w-cutoff,image_h))
 
         image_w, image_h = image1a.size
 
@@ -149,10 +149,10 @@ while True:
 	uid = str(int(time()))
 	#base64.b16encode(strftime("%d%a%H%M%S", gmtime()))
 	#print strftime("%a%H%M%S", gmtime())
-        draw.text((imagepos_w+20,images_h+top), camera1.buffer[0][0]+" 1a", font = fnt)
-        draw.text((imagepos_w+20,images_h*2+top+100), camera1.buffer[-1][0]+" 1b", font = fnt)
-        draw.text((centre_w+imagepos_w-75,images_h+top), camera2.buffer[2][0]+" 2a", font = fnt)
-        draw.text((centre_w+imagepos_w-75,images_h*2+top+100), camera2.buffer[12][0]+" 2b", font = fnt)
+        draw.text((imagepos_w+20,images_h+top), camera1.buffer[2][0], font = fnt)
+        draw.text((imagepos_w+20,images_h*2+top+100), camera1.buffer[11][0], font = fnt)
+        draw.text((centre_w+imagepos_w-75,images_h+top), camera2.buffer[6][0], font = fnt)
+        draw.text((centre_w+imagepos_w-75,images_h*2+top+100), camera2.buffer[-1][0], font = fnt)
 
         #canvas.save("%s_upload.jpg" % uid)
 
@@ -176,6 +176,7 @@ while True:
 		for img_up in ["%s_1a.jpg" % uid, "%s_1b.jpg" % uid, "%s_2a.jpg" % uid, "%s_2b.jpg" % uid]:
 			k.key = img_up
 			k.set_contents_from_filename(img_up, cb=percent_cb, num_cb=10)
+			k.make_public()
 	except Exception, e:
 		print e
 
